@@ -1,0 +1,11 @@
+target/
+*.class
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+*.log
+.env
+*.local.yml
+.DS_Store
