@@ -23,8 +23,11 @@ public record ReservationResponse(
         @Schema(description = "Type of the reserved parking spot")
         ParkingType parkingSpotType,
 
-        @Schema(description = "Name or identifier of the person who made the reservation", example = "alice")
-        String requester,
+        @Schema(description = "Identifier of the user who made the reservation", example = "1")
+        Long userId,
+
+        @Schema(description = "Name of the user who made the reservation", example = "alice")
+        String userName,
 
         @Schema(description = "Start of the reservation window")
         LocalDateTime startTime,
@@ -42,7 +45,8 @@ public record ReservationResponse(
                 reservation.parkingSpot().id(),
                 reservation.parkingSpot().code(),
                 reservation.parkingSpot().type(),
-                reservation.requester(),
+                reservation.requester().id(),
+                reservation.requester().name(),
                 reservation.startTime(),
                 reservation.endTime(),
                 reservation.status());

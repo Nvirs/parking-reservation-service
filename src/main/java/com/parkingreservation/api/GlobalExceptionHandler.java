@@ -1,8 +1,10 @@
 package com.parkingreservation.api;
 
 import com.parkingreservation.api.dto.ErrorResponse;
+import com.parkingreservation.application.NoAvailableParkingSpotException;
 import com.parkingreservation.application.ParkingSpotNotFoundException;
 import com.parkingreservation.application.ReservationNotFoundException;
+import com.parkingreservation.application.UserNotFoundException;
 import com.parkingreservation.domain.model.ReservationAlreadyStartedException;
 import com.parkingreservation.domain.policy.ReservationPolicyViolationException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,12 +20,13 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ParkingSpotNotFoundException.class, ReservationNotFoundException.class})
+    @ExceptionHandler({ParkingSpotNotFoundException.class, ReservationNotFoundException.class, UserNotFoundException.class})
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex, HttpServletRequest request) {
         return errorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    @ExceptionHandler({ReservationPolicyViolationException.class, ReservationAlreadyStartedException.class})
+    @ExceptionHandler({ReservationPolicyViolationException.class, ReservationAlreadyStartedException.class,
+            NoAvailableParkingSpotException.class})
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex, HttpServletRequest request) {
         return errorResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
     }

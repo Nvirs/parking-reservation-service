@@ -6,13 +6,8 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
-@Schema(description = "Request payload to create a new reservation for a parking spot")
-public record CreateReservationRequest(
-
-        @NotNull(message = "parkingSpotId must not be null")
-        @Schema(description = "Identifier of the parking spot to reserve", example = "1",
-                requiredMode = Schema.RequiredMode.REQUIRED)
-        Long parkingSpotId,
+@Schema(description = "Request payload to auto-assign a suitable parking spot to a user")
+public record AutoAssignReservationRequest(
 
         @NotNull(message = "userId must not be null")
         @Schema(description = "Identifier of the user making the reservation", example = "1",
