@@ -4,6 +4,7 @@ import com.parkingreservation.domain.model.ParkingSpot;
 import com.parkingreservation.domain.model.ParkingType;
 import com.parkingreservation.domain.model.Reservation;
 import com.parkingreservation.domain.model.ReservationStatus;
+import com.parkingreservation.domain.model.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  */
 abstract class ReservationPolicyContractTest {
 
-    private static final LocalDateTime BASE = LocalDateTime.of(2026, 8, 3, 9, 0);
+    protected static final LocalDateTime BASE = LocalDateTime.of(2026, 8, 3, 9, 0);
     private static final AtomicLong PARKING_SPOT_ID_SEQUENCE = new AtomicLong(1);
 
     protected abstract ReservationPolicy policy();
@@ -30,17 +31,25 @@ abstract class ReservationPolicyContractTest {
 
     protected abstract ParkingType unsupportedType();
 
-    private ParkingSpot spotOf(ParkingType type) {
+    protected ParkingSpot spotOf(ParkingType type) {
         long id = PARKING_SPOT_ID_SEQUENCE.getAndIncrement();
         return new ParkingSpot(id, "SPOT-" + type + "-" + id, type);
     }
 
-    private Reservation reservationOn(ParkingSpot spot, LocalDateTime start, LocalDateTime end) {
-        return new Reservation(UUID.randomUUID(), spot, "requester", start, end);
+    protected User fullyEligibleRequester() {
+        return new User(1L, "requester", true, true);
+    }
+
+    protected Reservation reservationOn(ParkingSpot spot, LocalDateTime start, LocalDateTime end) {
+        return new Reservation(UUID.randomUUID(), spot, fullyEligibleRequester(), start, end);
+    }
+
+    protected Reservation reservationOn(ParkingSpot spot, LocalDateTime start, LocalDateTime end, User requester) {
+        return new Reservation(UUID.randomUUID(), spot, requester, start, end);
     }
 
     private Reservation reservationOn(ParkingSpot spot, LocalDateTime start, LocalDateTime end, ReservationStatus status) {
-        return new Reservation(UUID.randomUUID(), spot, "requester", start, end, status);
+        return new Reservation(UUID.randomUUID(), spot, fullyEligibleRequester(), start, end, status);
     }
 
     @Test

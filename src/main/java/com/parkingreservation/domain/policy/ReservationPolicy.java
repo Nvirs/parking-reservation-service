@@ -43,4 +43,18 @@ public interface ReservationPolicy {
             }
         }
     }
+
+    default void requireElectricVehicleOwner(Reservation request) {
+        if (!request.requester().electricVehicleOwner()) {
+            throw new ReservationPolicyViolationException(
+                    "EV parking spots require the requester to be registered as an electric vehicle owner");
+        }
+    }
+
+    default void requireHandicappedPermitHolder(Reservation request) {
+        if (!request.requester().handicappedPermitHolder()) {
+            throw new ReservationPolicyViolationException(
+                    "Handicapped parking spots require the requester to hold a handicapped permit");
+        }
+    }
 }
