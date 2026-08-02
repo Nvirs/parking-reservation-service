@@ -54,9 +54,7 @@ public class ReservationService {
         return createReservation(spotEntity, userEntity, startTime, endTime);
     }
 
-    // picks a suitable free spot for the user instead of requiring one to be named explicitly:
-    // a handicapped-permit holder only ever gets a HANDICAPPED spot, an electric vehicle owner
-    // prefers EV but falls back to STANDARD, everyone else only considers STANDARD
+    // picks a suitable parking spot for the requester and reserves it for the given time window
     @Transactional
     public Reservation reserveAutoAssign(Long userId, LocalDateTime startTime, LocalDateTime endTime) {
         UserEntity userEntity = userRepository.findById(userId)
@@ -85,8 +83,8 @@ public class ReservationService {
                 .toList();
     }
 
-    // lists every parking spot together with whether it is occupied by an ACTIVE reservation right now;
-    // purely informational (it does not restrict which spots can be booked for a future window)
+    // lists every parking spot together with whether it is occupied by an active reservation right now
+    
     @Transactional(readOnly = true)
     public List<ParkingSpotAvailability> listAvailability(LocalDateTime asOf) {
         Set<Long> occupiedSpotIds = reservationRepository

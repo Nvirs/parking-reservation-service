@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Parking Reservation - Test Client</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.25rem; }
+  section { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
+  label { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
+  input, select { width: 100%; box-sizing: border-box; padding: 0.35rem; margin-top: 0.15rem; }
+  button { margin-top: 0.75rem; padding: 0.4rem 0.9rem; cursor: pointer; }
+  pre { background: #f5f5f5; padding: 0.75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+  .error { background: #fdecea; color: #a12622; border: 1px solid #f5c2c0; border-radius: 4px;
+           padding: 0.6rem 0.75rem; margin-top: 0.75rem; font-size: 0.9rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; }
+  .status-free { color: #1e7d34; font-weight: 600; }
+  .status-occupied { color: #a12622; font-weight: 600; }
+  .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+  .checkbox-row input { width: auto; margin: 0; }
+</style>
+</head>
+<body>
+<h1>Parking Reservation - Test Client</h1>
+
+<section>
+  <h2>Register user</h2>
+  <label>Name
+    <input id="registerName" type="text" placeholder="e.g. Erin">
+  </label>
+  <div class="checkbox-row">
+    <input id="registerElectric" type="checkbox">
+    <label style="margin:0">Electric vehicle owner</label>
+  </div>
+  <div class="checkbox-row">
+    <input id="registerHandicapped" type="checkbox">
+    <label style="margin:0">Handicapped permit holder</label>
+  </div>
+  <button onclick="registerUser()">Register</button>
+  <div id="registerResult"></div>
+</section>
+
+<section>
+  <h2>Create reservation</h2>
+  <label>Parking spot
+    <select id="createSpotId"></select>
+  </label>
+  <label>User
+    <select id="createUserId"></select>
+  </label>
+  <label>Start time
+    <input id="createStart" type="datetime-local">
+  </label>
+  <label>End time
+    <input id="createEnd" type="datetime-local">
+  </label>
+  <button onclick="createReservation()">Create</button>
+  <div id="createResult"></div>
+</section>
+
+<section>
+  <h2>Auto-assign reservation</h2>
+  <p style="font-size:0.85rem;color:#555;margin:0">Picks a suitable free spot automatically: handicapped-permit
+    holders only get a HANDICAPPED spot, EV owners prefer EV but fall back to STANDARD.</p>
+  <label>User
+    <select id="autoAssignUserId"></select>
+  </label>
+  <label>Start time
+    <input id="autoAssignStart" type="datetime-local">
+  </label>
+  <label>End time
+    <input id="autoAssignEnd" type="datetime-local">
+  </label>
+  <button onclick="autoAssignReservation()">Auto-assign</button>
+  <div id="autoAssignResult"></div>
+</section>
+
+<section>
+  <h2>List reservations for a spot</h2>
+  <label>Parking spot
+    <select id="listSpotId"></select>
+  </label>
+  <button onclick="listReservations()">List</button>
+  <div id="listResult"></div>
+</section>
+
+<section>
+  <h2>Cancel reservation</h2>
+  <label>Reservation ID
+    <input id="cancelReservationId" type="text" placeholder="uuid">
+  </label>
+  <button onclick="cancelReservation()">Cancel</button>
+  <div id="cancelResult"></div>
+</section>
+
+<section>
+  <h2>Live occupancy</h2>
+  <button onclick="loadParkingSpots()">Refresh</button>
+  <table id="occupancyTable">
+    <thead><tr><th>Spot</th><th>Type</th><th>Status</th></tr></thead>
+    <tbody id="occupancyBody"></tbody>
+  </table>
+</section>
+
+<script>
+  let parkingSpots = [];
+  let users = [];
+
+  function defaultDateTime(hour) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    // format "YYYY-MM-DDTHH:MM"
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  for (const [startId, endId] of [['createStart', 'createEnd'], ['autoAssignStart', 'autoAssignEnd']]) {
+    document.getElementById(startId).value = defaultDateTime(9);
+    document.getElementById(endId).value = defaultDateTime(11);
+  }
+
+  function userLabel(user) {
+    const traits = [];
+    if (user.electricVehicleOwner) traits.push('EV');
+    if (user.handicappedPermitHolder) traits.push('Handicapped');
+    return `${user.name} (${traits.length ? traits.join(' + ') : 'Standard'})`;
+  }
+
+  function fillSelect(select, options) {
+    select.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  }
+
+  async function loadUsers() {
+    const response = await fetch('/api/users');
+    users = await response.json();
+    const options = users.map(u => ({ value: u.id, label: userLabel(u) }));
+    for (const id of ['createUserId', 'autoAssignUserId']) {
+      fillSelect(document.getElementById(id), options);
+    }
+  }
+
+  async function loadParkingSpots() {
+    const response = await fetch('/api/parking-spots');
+    parkingSpots = await response.json();
+    const options = parkingSpots.map(s => ({ value: s.id, label: `${s.code} (${s.type})` }));
+    for (const id of ['createSpotId', 'listSpotId']) {
+      fillSelect(document.getElementById(id), options);
+    }
+
+    const body = document.getElementById('occupancyBody');
+    body.innerHTML = parkingSpots.map(s => `<tr>
+      <td>${s.code}</td>
+      <td>${s.type}</td>
+      <td class="${s.occupiedNow ? 'status-occupied' : 'status-free'}">${s.occupiedNow ? 'Occupied' : 'Free'}</td>
+    </tr>`).join('');
+  }
+
+  async function showResult(elementId, response, failurePrefix) {
+    const el = document.getElementById(elementId);
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (response.ok) {
+      const pre = document.createElement('pre');
+      pre.textContent = `HTTP ${response.status}\n` + (body ? JSON.stringify(body, null, 2) : '(no body)');
+      el.replaceChildren(pre);
+    } else {
+      const message = body && body.message ? body.message : `HTTP ${response.status}`;
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = `${failurePrefix}: ${message}`;
+      el.replaceChildren(div);
+    }
+    return response.ok;
+  }
+
+  async function registerUser() {
+    const payload = {
+      name: document.getElementById('registerName').value,
+      electricVehicleOwner: document.getElementById('registerElectric').checked,
+      handicappedPermitHolder: document.getElementById('registerHandicapped').checked
+    };
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const ok = await showResult('registerResult', response, 'Registration failed');
+    if (ok) {
+      document.getElementById('registerName').value = '';
+      document.getElementById('registerElectric').checked = false;
+      document.getElementById('registerHandicapped').checked = false;
+      await loadUsers();
+    }
+  }
+
+  async function createReservation() {
+    const payload = {
+      parkingSpotId: Number(document.getElementById('createSpotId').value),
+      userId: Number(document.getElementById('createUserId').value),
+      startTime: document.getElementById('createStart').value,
+      endTime: document.getElementById('createEnd').value
+    };
+    const response = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const ok = await showResult('createResult', response, 'Reservation failed');
+    if (ok) await loadParkingSpots();
+  }
+
+  async function autoAssignReservation() {
+    const payload = {
+      userId: Number(document.getElementById('autoAssignUserId').value),
+      startTime: document.getElementById('autoAssignStart').value,
+      endTime: document.getElementById('autoAssignEnd').value
+    };
+    const response = await fetch('/api/reservations/auto-assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const ok = await showResult('autoAssignResult', response, 'Auto-assign failed');
+    if (ok) await loadParkingSpots();
+  }
+
+  async function listReservations() {
+    const spotId = document.getElementById('listSpotId').value;
+    const response = await fetch(`/api/parking-spots/${spotId}/reservations`);
+    await showResult('listResult', response, 'Query failed');
+  }
+
+  async function cancelReservation() {
+    const reservationId = document.getElementById('cancelReservationId').value;
+    const response = await fetch(`/api/reservations/${reservationId}/cancel`, { method: 'POST' });
+    const ok = await showResult('cancelResult', response, 'Cancellation failed');
+    if (ok) await loadParkingSpots();
+  }
+
+  loadUsers();
+  loadParkingSpots();
+</script>
+</body>
+</html>
