@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE parking_spots (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id         BIGSERIAL PRIMARY KEY,
     code       VARCHAR(50) NOT NULL,
     type       VARCHAR(20) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
@@ -13,7 +13,7 @@ CREATE TABLE parking_spots (
 
 CREATE TABLE reservations (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    parking_spot_id  UUID NOT NULL,
+    parking_spot_id  BIGINT NOT NULL,
     requester        VARCHAR(255) NOT NULL,
     start_time       TIMESTAMP NOT NULL,
     end_time         TIMESTAMP NOT NULL,

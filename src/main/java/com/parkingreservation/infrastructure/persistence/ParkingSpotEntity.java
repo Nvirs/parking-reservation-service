@@ -13,15 +13,14 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "parking_spots")
 public class ParkingSpotEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false, unique = true)
     private String code;
@@ -46,7 +45,7 @@ public class ParkingSpotEntity {
         this.type = type;
     }
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 

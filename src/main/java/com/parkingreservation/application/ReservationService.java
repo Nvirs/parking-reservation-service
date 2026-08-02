@@ -38,7 +38,7 @@ public class ReservationService {
 
     // reserves a parking spot for the given requester and time window
     @Transactional
-    public Reservation reserve(UUID parkingSpotId, String requester, LocalDateTime startTime, LocalDateTime endTime) {
+    public Reservation reserve(Long parkingSpotId, String requester, LocalDateTime startTime, LocalDateTime endTime) {
         ParkingSpotEntity spotEntity = parkingSpotRepository.findById(parkingSpotId)
                 .orElseThrow(() -> new ParkingSpotNotFoundException(parkingSpotId));
         ParkingSpot spot = toDomain(spotEntity);
@@ -57,7 +57,7 @@ public class ReservationService {
     }
  
     @Transactional(readOnly = true)
-    public List<Reservation> findReservationsForSpot(UUID parkingSpotId) {
+    public List<Reservation> findReservationsForSpot(Long parkingSpotId) {
         if (!parkingSpotRepository.existsById(parkingSpotId)) {
             throw new ParkingSpotNotFoundException(parkingSpotId);
         }

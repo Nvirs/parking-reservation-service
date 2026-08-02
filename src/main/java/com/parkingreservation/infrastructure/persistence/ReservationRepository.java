@@ -7,5 +7,5 @@ import java.util.UUID;
 
 public interface ReservationRepository extends JpaRepository<ReservationEntity, UUID> {
 
-    List<ReservationEntity> findByParkingSpot_Id(UUID parkingSpotId);
+    List<ReservationEntity> findByParkingSpot_Id(Long parkingSpotId);
 }

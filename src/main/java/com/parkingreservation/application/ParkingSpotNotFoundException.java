@@ -1,10 +1,8 @@
 package com.parkingreservation.application;
 
-import java.util.UUID;
-
 public class ParkingSpotNotFoundException extends RuntimeException {
 
-    public ParkingSpotNotFoundException(UUID parkingSpotId) {
+    public ParkingSpotNotFoundException(Long parkingSpotId) {
         super("Parking spot %s not found".formatted(parkingSpotId));
     }
 }
