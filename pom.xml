@@ -13,7 +13,7 @@
 
     <groupId>com.parkingreservation</groupId>
     <artifactId>parking-reservation-service</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.1</version>
     <name>parking-reservation-service</name>
     <description>Parking space reservation service</description>
 
