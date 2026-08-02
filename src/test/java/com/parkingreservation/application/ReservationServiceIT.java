@@ -30,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 @Transactional
 class ReservationServiceIT extends AbstractPostgresIntegrationTest {
 
+    private static final Long UNKNOWN_PARKING_SPOT_ID = -1L;
+
     @Autowired
     private ReservationService reservationService;
 
@@ -43,14 +45,14 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
         return LocalDateTime.now().plusDays(1).withHour(hour).withMinute(0).withSecond(0).withNano(0);
     }
 
-    private UUID givenParkingSpot(String code, ParkingType type) {
+    private Long givenParkingSpot(String code, ParkingType type) {
         return parkingSpotRepository.saveAndFlush(new ParkingSpotEntity(code, type)).getId();
     }
 
     @Test
     @DisplayName("reserving a standard spot with no conflicts persists an ACTIVE reservation")
     void reservesAStandardParkingSpot() {
-        UUID spotId = givenParkingSpot("A-1", ParkingType.STANDARD);
+        Long spotId = givenParkingSpot("A-1", ParkingType.STANDARD);
 
         Reservation reservation = reservationService.reserve(spotId, "alice", tomorrowAt(9), tomorrowAt(11));
 
@@ -61,7 +63,7 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @Test
     @DisplayName("reserving an EV spot is validated by the EV policy, not the standard one")
     void reservesAnEvParkingSpot() {
-        UUID spotId = givenParkingSpot("EV-1", ParkingType.EV);
+        Long spotId = givenParkingSpot("EV-1", ParkingType.EV);
 
         Reservation reservation = reservationService.reserve(spotId, "bob", tomorrowAt(9), tomorrowAt(11));
 
@@ -72,7 +74,7 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @Test
     @DisplayName("rejects a reservation that overlaps an existing active one for the same spot, and persists nothing new")
     void rejectsOverlappingReservationForSameSpot() {
-        UUID spotId = givenParkingSpot("A-2", ParkingType.STANDARD);
+        Long spotId = givenParkingSpot("A-2", ParkingType.STANDARD);
         reservationService.reserve(spotId, "alice", tomorrowAt(9), tomorrowAt(11));
 
         assertThatExceptionOfType(ReservationPolicyViolationException.class).isThrownBy(() ->
@@ -84,8 +86,8 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @Test
     @DisplayName("accepts a reservation for a different spot even if the time window overlaps")
     void acceptsOverlappingReservationForDifferentSpot() {
-        UUID spotA = givenParkingSpot("A-3", ParkingType.STANDARD);
-        UUID spotB = givenParkingSpot("A-4", ParkingType.STANDARD);
+        Long spotA = givenParkingSpot("A-3", ParkingType.STANDARD);
+        Long spotB = givenParkingSpot("A-4", ParkingType.STANDARD);
         reservationService.reserve(spotA, "alice", tomorrowAt(9), tomorrowAt(11));
 
         Reservation reservation = reservationService.reserve(spotB, "bob", tomorrowAt(9), tomorrowAt(11));
@@ -97,14 +99,14 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @DisplayName("reserving an unknown parking spot throws ParkingSpotNotFoundException")
     void reservingUnknownParkingSpotThrows() {
         assertThatExceptionOfType(ParkingSpotNotFoundException.class).isThrownBy(() ->
-                reservationService.reserve(UUID.randomUUID(), "alice", tomorrowAt(9), tomorrowAt(11)));
+                reservationService.reserve(UNKNOWN_PARKING_SPOT_ID, "alice", tomorrowAt(9), tomorrowAt(11)));
     }
 
     @Test
     @DisplayName("finds only the reservations that belong to the requested parking spot")
     void findsReservationsForASpecificSpot() {
-        UUID spotA = givenParkingSpot("B-1", ParkingType.STANDARD);
-        UUID spotB = givenParkingSpot("B-2", ParkingType.STANDARD);
+        Long spotA = givenParkingSpot("B-1", ParkingType.STANDARD);
+        Long spotB = givenParkingSpot("B-2", ParkingType.STANDARD);
         reservationService.reserve(spotA, "alice", tomorrowAt(9), tomorrowAt(11));
         reservationService.reserve(spotB, "bob", tomorrowAt(9), tomorrowAt(11));
 
@@ -118,13 +120,13 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @DisplayName("querying reservations for an unknown parking spot throws ParkingSpotNotFoundException")
     void findingReservationsForUnknownSpotThrows() {
         assertThatExceptionOfType(ParkingSpotNotFoundException.class).isThrownBy(() ->
-                reservationService.findReservationsForSpot(UUID.randomUUID()));
+                reservationService.findReservationsForSpot(UNKNOWN_PARKING_SPOT_ID));
     }
 
     @Test
     @DisplayName("cancelling before the start time marks the reservation CANCELLED")
     void cancelsAReservationBeforeItStarts() {
-        UUID spotId = givenParkingSpot("C-1", ParkingType.STANDARD);
+        Long spotId = givenParkingSpot("C-1", ParkingType.STANDARD);
         Reservation reservation = reservationService.reserve(spotId, "alice", tomorrowAt(9), tomorrowAt(11));
 
         reservationService.cancel(reservation.id(), tomorrowAt(9).minusHours(1));
@@ -137,7 +139,7 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @DisplayName("cancelling at or after the start time throws and leaves the reservation ACTIVE")
     void cancellingAfterStartThrowsAndLeavesReservationActive() {
         // c2 is a standard spot so the standard policy applies
-        UUID spotId = givenParkingSpot("C-2", ParkingType.STANDARD);
+        Long spotId = givenParkingSpot("C-2", ParkingType.STANDARD);
         Reservation reservation = reservationService.reserve(spotId, "alice", tomorrowAt(9), tomorrowAt(11));
 
         assertThatExceptionOfType(ReservationAlreadyStartedException.class).isThrownBy(() ->
@@ -157,7 +159,7 @@ class ReservationServiceIT extends AbstractPostgresIntegrationTest {
     @Test
     @DisplayName("a cancelled reservation no longer blocks a new request for the same slot")
     void cancelledReservationFreesUpTheSlot() {
-        UUID spotId = givenParkingSpot("C-3", ParkingType.STANDARD);
+        Long spotId = givenParkingSpot("C-3", ParkingType.STANDARD);
         Reservation reservation = reservationService.reserve(spotId, "alice", tomorrowAt(9), tomorrowAt(11));
         reservationService.cancel(reservation.id(), tomorrowAt(9).minusHours(1));
 

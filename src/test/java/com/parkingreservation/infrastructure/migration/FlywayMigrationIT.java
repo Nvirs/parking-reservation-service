@@ -21,10 +21,10 @@ class FlywayMigrationIT extends AbstractPostgresIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private UUID insertParkingSpot() {
+    private Long insertParkingSpot() {
         String code = "SPOT-" + UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO parking_spots (code, type) VALUES (?, 'STANDARD')", code);
-        return jdbcTemplate.queryForObject("SELECT id FROM parking_spots WHERE code = ?", UUID.class, code);
+        return jdbcTemplate.queryForObject("SELECT id FROM parking_spots WHERE code = ?", Long.class, code);
     }
 
     @Test
@@ -53,7 +53,7 @@ class FlywayMigrationIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void reservationStatusCheckConstraintRejectsUnknownStatuses() {
-        UUID spotId = insertParkingSpot();
+        Long spotId = insertParkingSpot();
 
         assertThatExceptionOfType(DataAccessException.class).isThrownBy(() ->
                 jdbcTemplate.update(
@@ -64,7 +64,7 @@ class FlywayMigrationIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void reservationTimeRangeCheckConstraintRejectsStartNotBeforeEnd() {
-        UUID spotId = insertParkingSpot();
+        Long spotId = insertParkingSpot();
 
         assertThatExceptionOfType(DataAccessException.class).isThrownBy(() ->
                 jdbcTemplate.update(
@@ -79,6 +79,6 @@ class FlywayMigrationIT extends AbstractPostgresIntegrationTest {
                 jdbcTemplate.update(
                         "INSERT INTO reservations (parking_spot_id, requester, start_time, end_time, status) " +
                                 "VALUES (?, 'alice', now() + interval '1 day', now() + interval '2 days', 'ACTIVE')",
-                        UUID.randomUUID()));
+                        -1L));
     }
 }

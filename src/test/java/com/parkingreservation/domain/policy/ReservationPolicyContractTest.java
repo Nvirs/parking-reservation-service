@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 abstract class ReservationPolicyContractTest {
 
     private static final LocalDateTime BASE = LocalDateTime.of(2026, 8, 3, 9, 0);
+    private static final AtomicLong PARKING_SPOT_ID_SEQUENCE = new AtomicLong(1);
 
     protected abstract ReservationPolicy policy();
 
@@ -29,7 +31,8 @@ abstract class ReservationPolicyContractTest {
     protected abstract ParkingType unsupportedType();
 
     private ParkingSpot spotOf(ParkingType type) {
-        return new ParkingSpot(UUID.randomUUID(), "SPOT-" + type, type);
+        long id = PARKING_SPOT_ID_SEQUENCE.getAndIncrement();
+        return new ParkingSpot(id, "SPOT-" + type + "-" + id, type);
     }
 
     private Reservation reservationOn(ParkingSpot spot, LocalDateTime start, LocalDateTime end) {

@@ -18,7 +18,7 @@ class ReservationTest {
     private static final LocalDateTime END = LocalDateTime.of(2026, 8, 3, 11, 0);
 
     private ParkingSpot spot() {
-        return new ParkingSpot(UUID.randomUUID(), "A-1", ParkingType.STANDARD);
+        return new ParkingSpot(1L, "A-1", ParkingType.STANDARD);
     }
 
     @Test
