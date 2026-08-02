@@ -1,15 +1,19 @@
 package com.parkingreservation.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.parkingreservation.api.dto.AutoAssignReservationRequest;
 import com.parkingreservation.api.dto.CreateReservationRequest;
+import com.parkingreservation.application.NoAvailableParkingSpotException;
 import com.parkingreservation.application.ParkingSpotNotFoundException;
 import com.parkingreservation.application.ReservationNotFoundException;
 import com.parkingreservation.application.ReservationService;
+import com.parkingreservation.application.UserNotFoundException;
 import com.parkingreservation.domain.model.ParkingSpot;
 import com.parkingreservation.domain.model.ParkingType;
 import com.parkingreservation.domain.model.Reservation;
 import com.parkingreservation.domain.model.ReservationAlreadyStartedException;
 import com.parkingreservation.domain.model.ReservationStatus;
+import com.parkingreservation.domain.model.User;
 import com.parkingreservation.domain.policy.ReservationPolicyViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReservationControllerTest {
 
     private static final Long PARKING_SPOT_ID = 1L;
+    private static final Long USER_ID = 1L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -61,10 +66,11 @@ class ReservationControllerTest {
 
     private static Reservation reservation(UUID id, LocalDateTime start, LocalDateTime end, ReservationStatus status) {
         ParkingSpot spot = new ParkingSpot(PARKING_SPOT_ID, "A-1", ParkingType.STANDARD);
-        return new Reservation(id, spot, "alice", start, end, status);
+        User requester = new User(USER_ID, "alice", false, false);
+        return new Reservation(id, spot, requester, start, end, status);
     }
 
-    //create happy path 
+    //create happy path
 
     @Test
     @DisplayName("POST /api/reservations returns 201 with the created reservation")
@@ -72,10 +78,10 @@ class ReservationControllerTest {
         UUID reservationId = UUID.randomUUID();
         LocalDateTime start = tomorrowAt(9);
         LocalDateTime end = tomorrowAt(11);
-        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq("alice"), eq(start), eq(end)))
+        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq(USER_ID), eq(start), eq(end)))
                 .willReturn(reservation(reservationId, start, end, ReservationStatus.ACTIVE));
 
-        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, "alice", start, end);
+        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, start, end);
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +91,8 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.id").value(reservationId.toString()))
                 .andExpect(jsonPath("$.parkingSpotId").value(PARKING_SPOT_ID))
                 .andExpect(jsonPath("$.parkingSpotCode").value("A-1"))
-                .andExpect(jsonPath("$.requester").value("alice"))
+                .andExpect(jsonPath("$.userId").value(USER_ID))
+                .andExpect(jsonPath("$.userName").value("alice"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
@@ -94,7 +101,8 @@ class ReservationControllerTest {
     @Test
     @DisplayName("POST /api/reservations rejects a null parkingSpotId with 400 and never calls the service")
     void createRejectsNullParkingSpotId() throws Exception {
-        CreateReservationRequest request = new CreateReservationRequest(null, "alice", tomorrowAt(9), tomorrowAt(11));
+        CreateReservationRequest request =
+                new CreateReservationRequest(null, USER_ID, tomorrowAt(9), tomorrowAt(11));
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -108,16 +116,16 @@ class ReservationControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/reservations rejects a blank requester with 400")
-    void createRejectsBlankRequester() throws Exception {
+    @DisplayName("POST /api/reservations rejects a null userId with 400")
+    void createRejectsNullUserId() throws Exception {
         CreateReservationRequest request =
-                new CreateReservationRequest(PARKING_SPOT_ID, "  ", tomorrowAt(9), tomorrowAt(11));
+                new CreateReservationRequest(PARKING_SPOT_ID, null, tomorrowAt(9), tomorrowAt(11));
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details", hasItem(containsString("requester"))));
+                .andExpect(jsonPath("$.details", hasItem(containsString("userId"))));
 
         verifyNoInteractions(reservationService);
     }
@@ -126,7 +134,7 @@ class ReservationControllerTest {
     @DisplayName("POST /api/reservations rejects a null startTime with 400")
     void createRejectsNullStartTime() throws Exception {
         CreateReservationRequest request =
-                new CreateReservationRequest(PARKING_SPOT_ID, "alice", null, tomorrowAt(11));
+                new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, null, tomorrowAt(11));
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -142,7 +150,7 @@ class ReservationControllerTest {
     void createRejectsPastStartTime() throws Exception {
         LocalDateTime pastStart = LocalDateTime.now().minusDays(1);
         CreateReservationRequest request =
-                new CreateReservationRequest(PARKING_SPOT_ID, "alice", pastStart, tomorrowAt(11));
+                new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, pastStart, tomorrowAt(11));
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -160,10 +168,10 @@ class ReservationControllerTest {
     void createReturns404WhenParkingSpotNotFound() throws Exception {
         LocalDateTime start = tomorrowAt(9);
         LocalDateTime end = tomorrowAt(11);
-        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq("alice"), eq(start), eq(end)))
+        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq(USER_ID), eq(start), eq(end)))
                 .willThrow(new ParkingSpotNotFoundException(PARKING_SPOT_ID));
 
-        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, "alice", start, end);
+        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, start, end);
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -175,14 +183,32 @@ class ReservationControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/reservations returns 404 when the user does not exist")
+    void createReturns404WhenUserNotFound() throws Exception {
+        LocalDateTime start = tomorrowAt(9);
+        LocalDateTime end = tomorrowAt(11);
+        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq(USER_ID), eq(start), eq(end)))
+                .willThrow(new UserNotFoundException(USER_ID));
+
+        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, start, end);
+
+        mockMvc.perform(post("/api/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message", containsString(USER_ID.toString())));
+    }
+
+    @Test
     @DisplayName("POST /api/reservations returns 409 when the reservation conflicts with policy")
     void createReturns409WhenPolicyViolated() throws Exception {
         LocalDateTime start = tomorrowAt(9);
         LocalDateTime end = tomorrowAt(11);
-        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq("alice"), eq(start), eq(end)))
+        given(reservationService.reserve(eq(PARKING_SPOT_ID), eq(USER_ID), eq(start), eq(end)))
                 .willThrow(new ReservationPolicyViolationException("Requested time slot conflicts"));
 
-        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, "alice", start, end);
+        CreateReservationRequest request = new CreateReservationRequest(PARKING_SPOT_ID, USER_ID, start, end);
 
         mockMvc.perform(post("/api/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -192,7 +218,46 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.message").value("Requested time slot conflicts"));
     }
 
-    // cancel 
+    // auto-assign
+
+    @Test
+    @DisplayName("POST /api/reservations/auto-assign returns 201 with the created reservation")
+    void autoAssignReturnsCreatedReservation() throws Exception {
+        UUID reservationId = UUID.randomUUID();
+        LocalDateTime start = tomorrowAt(9);
+        LocalDateTime end = tomorrowAt(11);
+        given(reservationService.reserveAutoAssign(eq(USER_ID), eq(start), eq(end)))
+                .willReturn(reservation(reservationId, start, end, ReservationStatus.ACTIVE));
+
+        AutoAssignReservationRequest request = new AutoAssignReservationRequest(USER_ID, start, end);
+
+        mockMvc.perform(post("/api/reservations/auto-assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/reservations/" + reservationId))
+                .andExpect(jsonPath("$.userId").value(USER_ID))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("POST /api/reservations/auto-assign returns 409 when no suitable spot is free")
+    void autoAssignReturns409WhenNoSpotAvailable() throws Exception {
+        LocalDateTime start = tomorrowAt(9);
+        LocalDateTime end = tomorrowAt(11);
+        given(reservationService.reserveAutoAssign(eq(USER_ID), eq(start), eq(end)))
+                .willThrow(new NoAvailableParkingSpotException(USER_ID));
+
+        AutoAssignReservationRequest request = new AutoAssignReservationRequest(USER_ID, start, end);
+
+        mockMvc.perform(post("/api/reservations/auto-assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    // cancel
 
     @Test
     @DisplayName("POST /api/reservations/{id}/cancel returns 204 on success")
@@ -229,7 +294,7 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.status").value(409));
     }
 
-    //list reservations for a spot 
+    //list reservations for a spot
 
     @Test
     @DisplayName("GET /api/parking-spots/{id}/reservations returns 200 with the spot's reservations")

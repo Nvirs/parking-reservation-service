@@ -1,5 +1,6 @@
 package com.parkingreservation.api;
 
+import com.parkingreservation.api.dto.AutoAssignReservationRequest;
 import com.parkingreservation.api.dto.CreateReservationRequest;
 import com.parkingreservation.api.dto.ErrorResponse;
 import com.parkingreservation.api.dto.ReservationResponse;
@@ -48,7 +49,26 @@ public class ReservationController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<ReservationResponse> create(@Valid @RequestBody CreateReservationRequest request) {
         Reservation reservation = reservationService.reserve(
-                request.parkingSpotId(), request.requester(), request.startTime(), request.endTime());
+                request.parkingSpotId(), request.userId(), request.startTime(), request.endTime());
+        ReservationResponse body = ReservationResponse.from(reservation);
+        return ResponseEntity.created(URI.create("/api/reservations/" + reservation.id())).body(body);
+    }
+
+    @PostMapping("/reservations/auto-assign")
+    @Operation(summary = "Auto-assign a reservation",
+            description = "Picks a suitable free parking spot for the user and time window automatically: " +
+                    "a handicapped-permit holder only gets a HANDICAPPED spot, an electric vehicle owner " +
+                    "prefers EV but falls back to STANDARD, everyone else only considers STANDARD")
+    @ApiResponse(responseCode = "201", description = "Reservation created")
+    @ApiResponse(responseCode = "400", description = "Invalid request payload",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "User not found",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "No suitable parking spot is free for the requested window",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<ReservationResponse> autoAssign(@Valid @RequestBody AutoAssignReservationRequest request) {
+        Reservation reservation = reservationService.reserveAutoAssign(
+                request.userId(), request.startTime(), request.endTime());
         ReservationResponse body = ReservationResponse.from(reservation);
         return ResponseEntity.created(URI.create("/api/reservations/" + reservation.id())).body(body);
     }
