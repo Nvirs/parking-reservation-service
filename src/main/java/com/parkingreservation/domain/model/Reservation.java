@@ -1,41 +1,45 @@
 package com.parkingreservation.domain.model;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
 public class Reservation {
 
+    private static final Duration MIN_DURATION = Duration.ofMinutes(15);
+    private static final Duration MAX_DURATION = Duration.ofHours(24);
+
     private final UUID id;
     private final ParkingSpot parkingSpot;
-    private final String requester;
+    private final User requester;
     private final LocalDateTime startTime;
     private final LocalDateTime endTime;
     private ReservationStatus status;
 
-    public Reservation(UUID id, ParkingSpot parkingSpot, String requester,
+    public Reservation(UUID id, ParkingSpot parkingSpot, User requester,
                         LocalDateTime startTime, LocalDateTime endTime) {
         this(id, parkingSpot, requester, startTime, endTime, ReservationStatus.ACTIVE);
     }
     // constructor with status parameter
-    public Reservation(UUID id, ParkingSpot parkingSpot, String requester,
+    public Reservation(UUID id, ParkingSpot parkingSpot, User requester,
                         LocalDateTime startTime, LocalDateTime endTime, ReservationStatus status) {
         this.parkingSpot = Objects.requireNonNull(parkingSpot, "parkingSpot must not be null");
-        this.requester = requireNonBlank(requester, "requester must not be blank");
+        this.requester = Objects.requireNonNull(requester, "requester must not be null");
         this.startTime = Objects.requireNonNull(startTime, "startTime must not be null");
         this.endTime = Objects.requireNonNull(endTime, "endTime must not be null");
         if (!startTime.isBefore(endTime)) {
             throw new IllegalArgumentException("startTime must be before endTime");
         }
+        Duration duration = Duration.between(startTime, endTime);
+        if (duration.compareTo(MIN_DURATION) < 0) {
+            throw new IllegalArgumentException("reservation duration must be at least " + MIN_DURATION.toMinutes() + " minutes");
+        }
+        if (duration.compareTo(MAX_DURATION) > 0) {
+            throw new IllegalArgumentException("reservation duration must be at most " + MAX_DURATION.toHours() + " hours");
+        }
         this.id = id;
         this.status = Objects.requireNonNull(status, "status must not be null");
-    }
-
-    private static String requireNonBlank(String value, String message) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(message);
-        }
-        return value;
     }
 
     public void cancel(LocalDateTime now) {
@@ -62,7 +66,7 @@ public class Reservation {
         return parkingSpot;
     }
 
-    public String requester() {
+    public User requester() {
         return requester;
     }
 
