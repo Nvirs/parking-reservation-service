@@ -32,8 +32,9 @@ public class ReservationEntity {
     @JoinColumn(name = "parking_spot_id", nullable = false)
     private ParkingSpotEntity parkingSpot;
 
-    @Column(nullable = false)
-    private String requester;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserEntity user;
 
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
@@ -56,10 +57,10 @@ public class ReservationEntity {
     protected ReservationEntity() {
     }
 
-    public ReservationEntity(ParkingSpotEntity parkingSpot, String requester,
+    public ReservationEntity(ParkingSpotEntity parkingSpot, UserEntity user,
                               LocalDateTime startTime, LocalDateTime endTime, ReservationStatus status) {
         this.parkingSpot = parkingSpot;
-        this.requester = requester;
+        this.user = user;
         this.startTime = startTime;
         this.endTime = endTime;
         this.status = status;
@@ -74,8 +75,8 @@ public class ReservationEntity {
         return parkingSpot;
     }
 
-    public String getRequester() {
-        return requester;
+    public UserEntity getUser() {
+        return user;
     }
 
     public LocalDateTime getStartTime() {

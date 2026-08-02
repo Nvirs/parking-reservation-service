@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +23,7 @@ class ParkingSpotRepositoryIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void savesAndReloadsAParkingSpotWithGeneratedIdAndTimestamps() {
-        ParkingSpotEntity saved = parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("A-1", ParkingType.STANDARD));
+        ParkingSpotEntity saved = parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("TEST-STD-1", ParkingType.STANDARD));
 
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getCreatedAt()).isNotNull();
@@ -31,7 +32,7 @@ class ParkingSpotRepositoryIT extends AbstractPostgresIntegrationTest {
         Optional<ParkingSpotEntity> reloaded = parkingSpotRepository.findById(saved.getId());
 
         assertThat(reloaded).isPresent();
-        assertThat(reloaded.get().getCode()).isEqualTo("A-1");
+        assertThat(reloaded.get().getCode()).isEqualTo("TEST-STD-1");
         assertThat(reloaded.get().getType()).isEqualTo(ParkingType.STANDARD);
     }
 
@@ -56,5 +57,18 @@ class ParkingSpotRepositoryIT extends AbstractPostgresIntegrationTest {
 
         assertThatExceptionOfType(DataIntegrityViolationException.class)
                 .isThrownBy(() -> parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("C-3", ParkingType.EV)));
+    }
+
+    @Test
+    void findsParkingSpotsByTypeOrderedByCode() {
+        parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("ZZ-EV-2", ParkingType.EV));
+        parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("ZZ-EV-1", ParkingType.EV));
+        parkingSpotRepository.saveAndFlush(new ParkingSpotEntity("ZZ-STD-1", ParkingType.STANDARD));
+
+        List<ParkingSpotEntity> evSpots = parkingSpotRepository.findByTypeOrderByCode(ParkingType.EV);
+
+        assertThat(evSpots).allSatisfy(spot -> assertThat(spot.getType()).isEqualTo(ParkingType.EV));
+        assertThat(evSpots.stream().map(ParkingSpotEntity::getCode).filter(code -> code.startsWith("ZZ-EV")).toList())
+                .containsExactly("ZZ-EV-1", "ZZ-EV-2");
     }
 }
