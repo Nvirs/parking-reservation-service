@@ -1,6 +1,7 @@
 package com.parkingreservation.application;
 
 import com.parkingreservation.domain.policy.EvParkingPolicy;
+import com.parkingreservation.domain.policy.HandicappedParkingPolicy;
 import com.parkingreservation.domain.policy.ReservationPolicy;
 import com.parkingreservation.domain.policy.StandardParkingPolicy;
 import org.springframework.context.annotation.Bean;
@@ -17,5 +18,10 @@ public class ReservationPolicyConfiguration {
     @Bean
     public ReservationPolicy evParkingPolicy() {
         return new EvParkingPolicy();
+    }
+
+    @Bean
+    public ReservationPolicy handicappedParkingPolicy() {
+        return new HandicappedParkingPolicy();
     }
 }
